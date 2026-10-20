@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14181f">
+<meta name="description" content="Algoritmi F2L, OLL e PLL con cubo 3D animato e ripasso">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cubo">
+<title>Cubo Algoritmi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); color-scheme: light; }
+body { margin: 0; font-size: 14px; font-family: system-ui, sans-serif; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<style>
+/* Layout: sul telefono tutto in colonna (cubo, poi elenco); da 880px il cubo resta fisso a sinistra e l'elenco scorre a destra. */
+:root {
+  --bg: #e8ecf1;
+  --surface: #ffffff;
+  --surface-2: #f0f3f7;
+  --stage-bg: #dde3ea;
+  --ink: #131922;
+  --muted: #566173;
+  --line: #d3dae3;
+  --accent: #f4b400;
+  --on-accent: #1b1400;
+  --thumb-off: #a3adbb;
+  --c-U: #ffd500; --c-D: #f1f1ec; --c-F: #0b4fc2; --c-B: #0b9a4b; --c-R: #c8202f; --c-L: #ff6a13;
+  --f-display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
+  --f-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1318; --surface: #181d24; --surface-2: #222933; --stage-bg: #1d232c; --ink: #e9edf2; --muted: #98a3b3;
+    --line: #2d3541; --accent: #f6c21a; --on-accent: #1b1400; --thumb-off: #4a5464; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1318; --surface: #181d24; --surface-2: #222933; --stage-bg: #1d232c; --ink: #e9edf2; --muted: #98a3b3;
+  --line: #2d3541; --accent: #f6c21a; --on-accent: #1b1400; --thumb-off: #4a5464; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45;
+  padding-block: 14px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app { max-width: 1100px; margin: 0 auto; display: grid; gap: 14px; }
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 28px; line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.progress { font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
+.progress b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.layout { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; min-width: 0; }
+.viewport { position: relative; height: clamp(250px, 70vw, 360px); background: var(--stage-bg); }
+.viewport canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.hint { position: absolute; left: 12px; bottom: 8px; font-size: 11.5px; color: var(--muted); pointer-events: none; }
+#noGL { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
+.stage-body { padding: 14px 14px 16px; display: grid; gap: 12px; }
+.case-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.case-kind { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h2 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 2px 0 0; line-height: 1.1; }
+.learn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.learn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.45; }
+.learn.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.learn.on svg { opacity: 1; }
+.alg { font-family: var(--f-mono); font-size: 15.5px; line-height: 2.1; background: var(--surface-2); border-radius: 12px; padding: 8px 12px; min-height: 52px; overflow-wrap: anywhere; }
+.mv { display: inline-block; padding: 0 6px; border-radius: 6px; line-height: 1.7; transition: opacity 0.15s; }
+.mv.done { opacity: 0.38; }
+.mv.next { background: var(--accent); color: var(--on-accent); }
+.grp { display: inline; border-bottom: 2px solid var(--line); padding-bottom: 1px; }
+.mask { font-family: var(--f-body); font-size: 14px; color: var(--muted); }
+.controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.transport { display: flex; align-items: center; gap: 8px; }
+.ib { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; padding: 0; }
+.ib svg { width: 22px; height: 22px; fill: currentColor; stroke: none; }
+.ib:disabled { opacity: 0.35; cursor: default; }
+.ib.go { width: 56px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface-2); padding: 8px 11px; font-size: 13px; font-weight: 600; min-width: 44px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.review { border-top: 1px dashed var(--line); padding-top: 12px; display: grid; gap: 10px; }
+.review p { margin: 0; font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 12px; padding: 11px 16px; font-weight: 700; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btnrow .btn { flex: 1 1 140px; }
+
+.library { min-width: 0; display: grid; gap: 12px; }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+.tab { border: 0; background: transparent; border-radius: 10px; padding: 8px 4px; display: grid; gap: 0; justify-items: center; font-weight: 700; font-size: 14px; }
+.tab small { font-weight: 500; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 14px; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.tab[aria-selected="true"] small { color: inherit; opacity: 0.75; }
+.tools { display: grid; gap: 10px; }
+#search { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+#search::placeholder { color: var(--muted); }
+.filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.chip { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.list { display: grid; gap: 8px; }
+.gh { margin: 10px 0 0; font-family: var(--f-display); font-size: 15px; font-weight: 600; color: var(--muted); }
+.gh:first-child { margin-top: 0; }
+.row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 40px; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 8px 8px 8px; cursor: pointer; }
+.row.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.th { width: 56px; height: 56px; display: grid; place-items: center; }
+.thumb { width: 56px; height: 56px; display: block; }
+.tagbox { background: var(--surface-2); border-radius: 10px; font-family: var(--f-mono); font-size: 13px; font-weight: 500; }
+.rn { font-weight: 700; }
+.ra { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.mark { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; padding: 0; }
+.mark svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.3; }
+.mark.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.mark.on svg { opacity: 1; }
+.empty { color: var(--muted); }
+.revbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 12px; }
+.revbox h3 { margin: 0; font-family: var(--f-display); font-size: 18px; }
+.revbox p { margin: 0; color: var(--muted); }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.notation { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.notation summary { font-weight: 700; cursor: pointer; }
+.notation ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); display: grid; gap: 6px; }
+.notation code { font-family: var(--f-mono); font-size: 13px; color: var(--ink); background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+.credit { color: var(--muted); font-size: 12.5px; margin: 0; }
+
+@media (min-width: 880px) {
+  .layout { grid-template-columns: 400px minmax(0, 1fr); gap: 20px; }
+  .stage { position: sticky; top: 14px; }
+  .viewport { height: 340px; }
+  h1 { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { .mv { transition: none; } }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Cubo Algoritmi</h1>
+      <p class="sub">F2L, OLL e PLL del metodo CFOP con cubo 3D animato</p>
+    </div>
+    <div class="progress" id="progress"></div>
+  </header>
+
+  <div class="layout">
+    <section class="stage" id="stage" aria-label="Visualizzatore dell'algoritmo">
+      <div class="viewport">
+        <canvas id="cv" aria-label="Cubo di Rubik 3D"></canvas>
+        <div id="noGL" hidden>Il browser non supporta WebGL. Gli algoritmi restano consultabili nell'elenco.</div>
+        <div class="hint">Trascina per ruotare la vista</div>
+      </div>
+      <div class="stage-body">
+        <div class="case-head">
+          <div>
+            <div class="case-kind" id="caseKind"></div>
+            <h2 id="caseName"></h2>
+          </div>
+          <button class="learn" id="learnBtn" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Lo so già</span>
+          </button>
+        </div>
+        <div class="alg" id="alg" aria-live="polite"></div>
+        <div class="controls" id="controls">
+          <div class="transport">
+            <button class="ib" id="bRestart" aria-label="Dal caso iniziale"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="3" height="14" rx="1"/><path d="M19 5.5v13L9.5 12z"/></svg></button>
+            <button class="ib" id="bBack" aria-label="Mossa precedente"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5.5v13L6 12z"/></svg></button>
+            <button class="ib go" id="bPlay" aria-label="Riproduci"></button>
+            <button class="ib" id="bNext" aria-label="Mossa successiva"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.5v13L18 12z"/></svg></button>
+          </div>
+          <div class="seg" id="speed" role="group" aria-label="Velocità">
+            <button data-s="0" aria-pressed="false">0.5×</button>
+            <button data-s="1" aria-pressed="true">1×</button>
+            <button data-s="2" aria-pressed="false">2×</button>
+          </div>
+        </div>
+        <div class="review" id="review" hidden>
+          <p id="revPrompt"></p>
+          <div class="btnrow">
+            <button class="btn primary" id="rShow">Mostra soluzione</button>
+          </div>
+          <div class="btnrow" id="rGrade" hidden>
+            <button class="btn primary" id="rKnew">Lo sapevo</button>
+            <button class="btn" id="rAgain">Da ripassare</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="library">
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Categorie">
+        <button class="tab" role="tab" data-tab="f2l" aria-selected="false">F2L<small></small></button>
+        <button class="tab" role="tab" data-tab="oll" aria-selected="true">OLL<small></small></button>
+        <button class="tab" role="tab" data-tab="pll" aria-selected="false">PLL<small></small></button>
+        <button class="tab" role="tab" data-tab="rev" aria-selected="false">Ripasso<small>&nbsp;</small></button>
+      </nav>
+      <div id="libView" class="tools">
+        <input id="search" type="search" placeholder="Cerca per numero, nome o mosse" autocomplete="off" aria-label="Cerca un caso">
+        <div class="filters" id="filters"></div>
+        <div class="list" id="list"></div>
+      </div>
+      <div id="revView" class="revbox" hidden>
+        <h3>Allenati a ricordare</h3>
+        <p>Vedi il caso sul cubo, provi a ricordare l'algoritmo, poi lo controlli.</p>
+        <div class="filters" id="revKinds">
+          <button class="chip" data-k="f2l">F2L</button>
+          <button class="chip on" data-k="oll">OLL</button>
+          <button class="chip on" data-k="pll">PLL</button>
+        </div>
+        <label class="check"><input type="checkbox" id="onlyNew"> Solo casi non ancora imparati</label>
+        <button class="btn" id="revNext">Salta al prossimo caso</button>
+        <p id="revMsg"></p>
+      </div>
+      <details class="notation">
+        <summary>Come leggere la notazione</summary>
+        <ul>
+          <li><code>R L U D F B</code> sono le facce destra, sinistra, alto, basso, fronte e retro. Senza segno, un quarto di giro orario guardando quella faccia.</li>
+          <li><code>R'</code> è antiorario, <code>R2</code> è mezzo giro.</li>
+          <li><code>r u f</code> minuscole girano due strati insieme. <code>M E S</code> girano lo strato centrale.</li>
+          <li><code>x y z</code> ruotano tutto il cubo come R, U, F.</li>
+          <li>Le parentesi raggruppano sequenze che si ripetono, utili per memorizzare.</li>
+        </ul>
+      </details>
+      <p class="credit">Gli algoritmi sono quelli di SolveTheCube.com/algorithms, qui con cubo 3D, ripasso e riproduzione mossa per mossa.</p>
+    </section>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+const CubeEngine = (function () {
+  const FACE_OF = { '0,1,0': 'U', '0,-1,0': 'D', '0,0,1': 'F', '0,0,-1': 'B', '1,0,0': 'R', '-1,0,0': 'L' };
+  const ID = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+  function mulMat(A, B) {
+    const C = new Array(9);
+    for (let i = 0; i < 3; i++)
+      for (let j = 0; j < 3; j++)
+        C[i * 3 + j] = A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j];
+    return C;
+  }
+  function mulVec(M, v) {
+    return [
+      M[0] * v[0] + M[1] * v[1] + M[2] * v[2],
+      M[3] * v[0] + M[4] * v[1] + M[5] * v[2],
+      M[6] * v[0] + M[7] * v[1] + M[8] * v[2],
+    ];
+  }
+  function rotMat(axis, q) {
+    q = ((q % 4) + 4) % 4;
+    const c = [1, 0, -1, 0][q], s = [0, 1, 0, -1][q];
+    if (axis === 0) return [1, 0, 0, 0, c, -s, 0, s, c];
+    if (axis === 1) return [c, 0, s, 0, 1, 0, -s, 0, c];
+    return [c, -s, 0, s, c, 0, 0, 0, 1];
+  }
+
+  // a = axis (0 x, 1 y, 2 z); sel = layer coordinates turned; q = quarter turns (right-hand rule, + = counterclockwise seen from +axis)
+  const ALL = [-1, 0, 1];
+  const BASE = {
+    R: { a: 0, sel: [1], q: -1 }, L: { a: 0, sel: [-1], q: 1 },
+    U: { a: 1, sel: [1], q: -1 }, D: { a: 1, sel: [-1], q: 1 },
+    F: { a: 2, sel: [1], q: -1 }, B: { a: 2, sel: [-1], q: 1 },
+    M: { a: 0, sel: [0], q: 1 }, E: { a: 1, sel: [0], q: 1 }, S: { a: 2, sel: [0], q: -1 },
+    r: { a: 0, sel: [0, 1], q: -1 }, l: { a: 0, sel: [-1, 0], q: 1 },
+    u: { a: 1, sel: [0, 1], q: -1 }, d: { a: 1, sel: [-1, 0], q: 1 },
+    f: { a: 2, sel: [0, 1], q: -1 }, b: { a: 2, sel: [-1, 0], q: 1 },
+    x: { a: 0, sel: ALL, q: -1, rot: true }, y: { a: 1, sel: ALL, q: -1, rot: true }, z: { a: 2, sel: ALL, q: -1, rot: true },
+  };
+
+  function normQ(q) {
+    q = ((q % 4) + 4) % 4;
+    return q === 3 ? -1 : q;
+  }
+
+  function tokenize(str) {
+    const out = [];
+    const re = /[()]|[^\s()]+/g;
+    let m;
+    while ((m = re.exec(str))) {
+      const t = m[0];
+      if (t === '(' || t === ')') { out.push({ t }); continue; }
+      const mm = /^([RLUDFBMESrludfbxyz])(2'|2|')?$/.exec(t);
+      if (!mm) throw new Error('Mossa non valida: ' + t);
+      const b = BASE[mm[1]];
+      const mult = mm[2] === "'" ? -1 : mm[2] ? 2 : 1;
+      out.push({ t: 'move', text: t, a: b.a, sel: b.sel, q: normQ(b.q * mult), rot: !!b.rot });
+    }
+    return out;
+  }
+  function parse(str) {
+    return tokenize(str).filter((t) => t.t === 'move');
+  }
+  function inverseMove(m) {
+    return { text: m.text, a: m.a, sel: m.sel, q: normQ(-m.q), rot: m.rot };
+  }
+  function invert(moves) {
+    return moves.slice().reverse().map(inverseMove);
+  }
+
+  function newCube() {
+    const cube = [];
+    for (let x = -1; x <= 1; x++)
+      for (let y = -1; y <= 1; y++)
+        for (let z = -1; z <= 1; z++) {
+          if (!x && !y && !z) continue;
+          cube.push({ home: [x, y, z], pos: [x, y, z], rot: ID.slice() });
+        }
+    return cube;
+  }
+  function applyMove(cube, m) {
+    const R = rotMat(m.a, m.q);
+    for (const c of cube) {
+      if (m.sel.indexOf(c.pos[m.a]) !== -1) {
+        c.pos = mulVec(R, c.pos);
+        c.rot = mulMat(R, c.rot);
+      }
+    }
+  }
+  function applyMoves(cube, moves) { for (const m of moves) applyMove(cube, m); }
+
+  function stickers(c) {
+    const out = [];
+    for (let ax = 0; ax < 3; ax++) {
+      if (!c.home[ax]) continue;
+      const ln = [0, 0, 0];
+      ln[ax] = c.home[ax];
+      out.push({ local: ln, color: FACE_OF[ln.join(',')], world: mulVec(c.rot, ln) });
+    }
+    return out;
+  }
+  function getSticker(cube, pos, normal) {
+    for (const c of cube) {
+      if (c.pos[0] === pos[0] && c.pos[1] === pos[1] && c.pos[2] === pos[2]) {
+        for (const s of stickers(c))
+          if (s.world[0] === normal[0] && s.world[1] === normal[1] && s.world[2] === normal[2]) return s.color;
+      }
+    }
+    return null;
+  }
+  function isSolved(cube) {
+    return cube.every((c) => c.pos.join() === c.home.join() && c.rot.join() === ID.join());
+  }
+
+  return { parse, tokenize, inverseMove, invert, newCube, applyMove, applyMoves, stickers, getSticker, isSolved, mulVec, mulMat, rotMat, ID, FACE_OF };
+})();
+
+
+const ALGS = {
+  f2l: [
+    { group: 'Casi base', items: [
+      "R U R'", "F' U' F", "U R U' R'", "U' F' U F" ] },
+    { group: 'Angolo e spigolo in alto', items: [
+      "(U' R U') (R' U R) U R'", "(U F' U) (F U' F') U' F", "(U' R U) (R' U R) U R'", "(U F' U') (F U' F') U' F",
+      "d (R' U2 R) d' (R U R')", "U' (R U2 R') d (R' U' R)", "(R U' R' U) d (R' U' R)", "(F' U F U') d' (F U F')",
+      "(U F' U2 F) (U F' U2 F)", "(U' R U2 R') (U' R U2 R')", "(U F' U' F) (U F' U2 F)", "(U' R U R') (U' R U2 R')" ] },
+    { group: 'Angolo rivolto in alto, spigolo in alto', items: [
+      "(R U2 R' U') (R U R')", "(F' U2 F U) (F' U' F)", "(U R U2 R') (U R U' R')", "(U' F' U2 F) (U' F' U F)",
+      "U2 (R U R' U) (R U' R')", "U2 (F' U' F U') (F' U F)", "(R U R' U') U' (R U R' U') (R U R')", "y' (R' U' R U) U (R' U' R U) (R' U' R)" ] },
+    { group: 'Angolo in alto, spigolo al centro', items: [
+      "(U F' U F) (U F' U2 F)", "(U' R U' R') (U' R U2 R')", "(U F' U' F) (d' F U F')", "(U' R U R') (d R' U' R)",
+      "(R U' R') (d R' U R)", "(R U R' U') (R U R' U') (R U R')" ] },
+    { group: 'Angolo in basso, spigolo in alto', items: [
+      "(U R U' R') (U' F' U F)", "(U' F' U F) (U R U' R')", "(F' U F) (U' F' U F)", "(R U' R') (U R U' R')",
+      "(R U R') (U' R U R')", "(F' U' F) (U F' U' F)" ] },
+    { group: 'Angolo in basso, spigolo al centro', items: [
+      "(R U' R' U) R U2 R' (U R U' R')", "(R U' R' U') (R U R' U') (R U2 R')", "(R U R' U') (R U' R') U d (R' U' R)",
+      "(R U' R') d (R' U' R U') (R' U' R)", "(R U' R' d R' U2 R) (U R' U2 R)" ] },
+  ],
+  oll: [
+    { group: 'Croci', items: [
+      [27, "(R' U2 R) U (R' U R)"], [26, "(R U2 R') U' (R U' R')"], [25, "F' (r U R' U') (r' F R)"],
+      [24, "(r U R' U') (r' F R F')"], [22, "R U2 (R2' U' R2 U') (R2' U2 R)"], [21, "(R U R') U (R U' R') U (R U2 R')"],
+      [23, "R2 D (R' U2 R) D' (R' U2 R')"] ] },
+    { group: 'Punti', items: [
+      [1, "(R U2 R') (R' F R F') U2 (R' F R F')"], [2, "F (R U R' U') F' f (R U R' U') f'"],
+      [4, "f (R U R' U') f' U F (R U R' U') F'"], [3, "f (R U R' U') f' U' F (R U R' U') F'"],
+      [19, "M U (R U R' U') M' (R' F R F')"], [18, "F (R U R' U) y' R' U2 (R' F R F')"],
+      [17, "(R U R' U) (R' F R F') U2 (R' F R F')"], [20, "M U (R U R' U') M2 (U R U' r')"] ] },
+    { group: 'Angoli', items: [
+      [57, "(R U R' U') M' (U R U' r')"], [28, "M' U' M U2' M' U' M"] ] },
+    { group: 'Linee', items: [
+      [55, "R U2 R2 (U' R U' R') U2 (F R F')"], [52, "(R U R' U) R d' R U' R' F'"],
+      [51, "f (R U R' U') (R U R' U') f'"], [56, "F (R U R' U') R F' (r U R' U') r'"] ] },
+    { group: 'T', items: [
+      [45, "F (R U R' U') F'"], [33, "(R U R' U') (R' F R F')"] ] },
+    { group: 'Z', items: [
+      [40, "R' F (R U R' U') F' U R"], [39, "L F' (L' U' L U) F U' L'"] ] },
+    { group: 'L grandi', items: [
+      [14, "(R' F R) U (R' F' R) y' (R U' R')"], [13, "F (U R U' R2) F' (R U R U' R')"],
+      [16, "r U r' (R U R' U') r U' r'"], [15, "l' U' l (L' U' L U) l' U l"] ] },
+    { group: 'C', items: [
+      [46, "R' U' (R' F R F') U R"], [34, "(R U R' U') x D' R' U R U' D x'"] ] },
+    { group: 'W', items: [
+      [38, "(R U R' U) (R U' R' U') (R' F R F')"], [36, "(L' U' L U') (L' U L U) (L F' L' F)"] ] },
+    { group: 'P', items: [
+      [44, "f (R U R' U') f'"], [43, "f' (L' U' L U) f"], [31, "R' U' F U R U' R' F' R"],
+      [32, "F U R U' F' r U R' U' r'"] ] },
+    { group: 'Quadrati', items: [
+      [35, "(R U2 R') (R' F R F') (R U2 R')"], [37, "F R' F' R U R U' R'"], [5, "r' U2 (R U R' U) r"],
+      [6, "r U2 R' U' R U' r'"] ] },
+    { group: 'L piccole', items: [
+      [48, "F (R U R' U') (R U R' U') F'"], [47, "F' (L' U' L U) (L' U' L U) F"],
+      [50, "R' F R2 B' R2' F' R2 B R'"], [49, "(R' F R' F') R2 U2 y (R' F R F')"],
+      [53, "(l' U' L U') (L' U L U') L' U2 l"], [54, "(r U R' U) (R U' R' U) R U2' r'"] ] },
+    { group: 'Altri', items: [
+      [11, "F' (L' U' L U) F y F (R U R' U') F'"], [12, "F (R U R' U') F' U F (R U R' U') F'"],
+      [7, "(r U R' U) R U2 r'"], [8, "r' U' R U' R' U2 r"], [10, "(R U R' U) (R' F R F') R U2 R'"],
+      [9, "(R U R' U') R' F R2 U R' U' F'"], [29, "(R U R' U') R U' R' F' U' (F R U R')"],
+      [42, "(R' F R F') (R' F R F') (R U R' U') (R U R')"],
+      [41, "(R U R' U) R U2 R' F (R U R' U') F'"], [30, "(L F' L' F) L' U2 L d (R U R')"] ] },
+  ],
+  pll: [
+    { group: 'Solo spigoli', items: [
+      ['H', "(M2 U M2) U2 (M2 U M2)"],
+      ['Z', "R' U' R2 U (R U R' U') R U R U' R U' R' U2"],
+      ['Ua', "R2 U' (R' U' R) U R U (R U' R)"],
+      ['Ub', "(R' U R' U') R' U' (R' U R) U R2"] ] },
+    { group: 'Solo angoli', items: [
+      ['Aa', "x z' R2 U2 (R' D' R) U2 (R' D R') z x'"],
+      ['Ab', "x R2 D2 (R U R') D2 (R U' R) x'"],
+      ['E', "R2 U R' U' y (R U R' U') (R U R' U') (R U R') y' (R U' R2')"] ] },
+    { group: 'Spigoli e angoli', items: [
+      ['T', "(R U R' U') R' F R2 U' R' U' R U R' F'"],
+      ['Y', "(F R U' R') U' (R U R' F') (R U R' U') (R' F R F')"],
+      ['F', "U' (R' U R U') R2 (F' U' F U) x (R U R' U') R2 x'"],
+      ['V', "(R' U R' U') y (R' D R' D') R2 y' (R' B' R B R)"],
+      ['Ja', "L' U' L F (L' U' L U) L F' L2 U L U"],
+      ['Jb', "R U R' F' (R U R' U') R' F R2 U' R' U'"],
+      ['Ra', "(L U2 L') U2 L F' (L' U' L U) L F L2 U"],
+      ['Rb', "(R' U2 R) U2 R' F (R U R' U') R' F' R2 U'"],
+      ['Na', "(R U R' U) (R U R' F') (R U R' U') R' F R2 U' R' U2 (R U' R')"],
+      ['Nb', "(R' U R U') R' (F' U' F) (R U R' F) R' F' (R U' R)"],
+      ['Ga', "y R2' u (R' U R' U') (R u' R2) y' (R' U R)"],
+      ['Gb', "(R' U' R) y R2 u (R' U R U') (R u' R2)"],
+      ['Gc', "y R2' u' R U' (R U R' u) R2 y (R U' R')"],
+      ['Gd', "y2 (R U R') y' (R2 u' R) U' (R' U R') u R2"] ] },
+  ],
+};
+
+
+(function () {
+  'use strict';
+  const E = CubeEngine;
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- casi ---------- */
+  const KIND = { f2l: 'F2L', oll: 'OLL', pll: 'PLL' };
+  const CASES = [];
+  ALGS.f2l.forEach((g, gi) => g.items.forEach((alg, i) => CASES.push({
+    id: 'f2l-' + (gi + 1) + '-' + (i + 1), kind: 'f2l', name: 'F2L ' + (gi + 1) + '.' + (i + 1), tag: (gi + 1) + '.' + (i + 1), group: g.group, alg })));
+  ALGS.oll.forEach((g) => g.items.forEach(([n, alg]) => CASES.push({
+    id: 'oll-' + n, kind: 'oll', name: 'OLL ' + n, tag: String(n), group: g.group, alg })));
+  ALGS.pll.forEach((g) => g.items.forEach(([n, alg]) => CASES.push({
+    id: 'pll-' + n, kind: 'pll', name: 'Perm ' + n, tag: n, group: g.group, alg })));
+  CASES.forEach((c) => { c.items = E.tokenize(c.alg); c.moves = c.items.filter((t) => t.t === 'move'); });
+  const byKind = (k) => CASES.filter((c) => c.kind === k);
+
+  /* ---------- memoria locale (solo comodita) ---------- */
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem('cubo-imparati') || '[]'); } catch (e) { return []; } },
+    set(a) { try { localStorage.setItem('cubo-imparati', JSON.stringify(a)); } catch (e) { /* ignora */ } },
+  };
+  const learned = new Set(store.get());
+  function saveLearned() { store.set([...learned]); }
+
+  /* ---------- cubo 3D ---------- */
+  const COL = { U: 0xffd500, D: 0xf1f1ec, F: 0x0b4fc2, B: 0x0b9a4b, R: 0xc8202f, L: 0xff6a13 };
+  let hasGL = true, renderer, scene, camera, cubeGroup, pivot, objs = [], dirty = true;
+  const cv = $('#cv');
+  let cube = E.newCube();
+
+  function roundedSquare(s, r) {
+    const h = s / 2, sh = new THREE.Shape();
+    sh.moveTo(-h + r, -h); sh.lineTo(h - r, -h); sh.quadraticCurveTo(h, -h, h, -h + r);
+    sh.lineTo(h, h - r); sh.quadraticCurveTo(h, h, h - r, h); sh.lineTo(-h + r, h);
+    sh.quadraticCurveTo(-h, h, -h, h - r); sh.lineTo(-h, -h + r); sh.quadraticCurveTo(-h, -h, -h + r, -h);
+    return new THREE.ShapeGeometry(sh);
+  }
+
+  function initGL() {
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    } catch (e) { hasGL = false; return; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    camera.position.set(5.3, 4.85, 7.8);
+    camera.lookAt(0, 0, 0);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.82));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.55);
+    dl.position.set(3, 7, 5);
+    scene.add(dl);
+    cubeGroup = new THREE.Group();
+    cubeGroup.rotation.order = 'YXZ';
+    scene.add(cubeGroup);
+    pivot = new THREE.Group();
+    cubeGroup.add(pivot);
+
+    const body = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x101114 });
+    const stickerGeo = roundedSquare(0.8, 0.13);
+    const mats = {};
+    Object.keys(COL).forEach((k) => { mats[k] = new THREE.MeshLambertMaterial({ color: COL[k] }); });
+
+    cube.forEach((c) => {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(body, bodyMat));
+      E.stickers(c).forEach((s) => {
+        const m = new THREE.Mesh(stickerGeo, mats[s.color]);
+        const n = new THREE.Vector3(s.local[0], s.local[1], s.local[2]);
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+        m.position.copy(n.multiplyScalar(0.478));
+        g.add(m);
+      });
+      cubeGroup.add(g);
+      objs.push(g);
+    });
+    const m4 = new THREE.Matrix4();
+    window.__sync = function () {
+      cube.forEach((c, i) => {
+        const o = objs[i], r = c.rot;
+        o.position.set(c.pos[0], c.pos[1], c.pos[2]);
+        m4.set(r[0], r[1], r[2], 0, r[3], r[4], r[5], 0, r[6], r[7], r[8], 0, 0, 0, 0, 1);
+        o.quaternion.setFromRotationMatrix(m4);
+      });
+      dirty = true;
+    };
+
+    // trascinamento per ruotare la vista
+    let drag = null;
+    cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignora */ } });
+    cv.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      cubeGroup.rotation.y += (e.clientX - drag.x) * 0.012;
+      cubeGroup.rotation.x = Math.max(-1.2, Math.min(1.2, cubeGroup.rotation.x + (e.clientY - drag.y) * 0.012));
+      drag = { x: e.clientX, y: e.clientY };
+      dirty = true;
+    });
+    const end = () => { drag = null; };
+    cv.addEventListener('pointerup', end);
+    cv.addEventListener('pointercancel', end);
+
+    const wrap = cv.parentElement;
+    const resize = () => {
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      dirty = true;
+    };
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(wrap);
+    window.addEventListener('resize', resize);
+    resize();
+    (function loop() {
+      if (dirty) { renderer.render(scene, camera); dirty = false; }
+      requestAnimationFrame(loop);
+    })();
+  }
+  const syncAll = () => { if (hasGL && window.__sync) window.__sync(); };
+
+  /* ---------- player ---------- */
+  let cur = null, moves = [], k = 0, busy = false, playing = false, runId = 0, speedIdx = 1, animState = null;
+  const SPEEDS = [760, 380, 190];
+  const AXIS = ['x', 'y', 'z'];
+
+  function dur(m) {
+    let d = SPEEDS[speedIdx] * (Math.abs(m.q) === 2 ? 1.45 : 1);
+    return reduceMotion ? d * 0.35 : d;
+  }
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  function animateMove(m, ms) {
+    return new Promise((resolve) => {
+      if (!hasGL) { E.applyMove(cube, m); resolve(); return; }
+      const idx = [];
+      cube.forEach((c, i) => { if (m.sel.indexOf(c.pos[m.a]) !== -1) idx.push(i); });
+      idx.forEach((i) => pivot.add(objs[i]));
+      const st = { cancel: false, idx };
+      animState = st;
+      const total = (m.q * Math.PI) / 2, t0 = performance.now();
+      function frame(now) {
+        if (st.cancel) return;
+        const t = Math.min(1, (now - t0) / ms);
+        pivot.rotation[AXIS[m.a]] = total * ease(t);
+        dirty = true;
+        if (t < 1) { requestAnimationFrame(frame); return; }
+        pivot.rotation.set(0, 0, 0);
+        idx.forEach((i) => cubeGroup.add(objs[i]));
+        E.applyMove(cube, m);
+        syncAll();
+        animState = null;
+        resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+  function cancelAnim() {
+    if (animState) {
+      animState.cancel = true;
+      animState.idx.forEach((i) => cubeGroup.add(objs[i]));
+      pivot.rotation.set(0, 0, 0);
+      animState = null;
+    }
+    busy = false;
+  }
+
+  function resetToStart() {
+    cube = E.newCube();
+    E.applyMoves(cube, E.invert(moves));
+    syncAll();
+    k = 0;
+    updateTokens();
+    updateButtons();
+  }
+  async function stepForward(id) {
+    if (busy || k >= moves.length) return;
+    busy = true;
+    await animateMove(moves[k], dur(moves[k]));
+    if (id !== runId) return;
+    k++; busy = false;
+    updateTokens(); updateButtons();
+  }
+  async function stepBack() {
+    if (busy || k <= 0) return;
+    const id = runId;
+    playing = false; busy = true; updateButtons();
+    await animateMove(E.inverseMove(moves[k - 1]), dur(moves[k - 1]));
+    if (id !== runId) return;
+    k--; busy = false;
+    updateTokens(); updateButtons();
+  }
+  async function play() {
+    if (busy || !cur) return;
+    const id = runId;
+    if (k >= moves.length) { resetToStart(); await sleep(260); if (id !== runId) return; }
+    playing = true; updateButtons();
+    while (playing && k < moves.length && id === runId) {
+      await stepForward(id);
+      if (id !== runId) return;
+      await sleep(reduceMotion ? 40 : 100);
+    }
+    if (id === runId) { playing = false; updateButtons(); }
+  }
+  function pause() { playing = false; updateButtons(); }
+
+  function loadCase(c, opts) {
+    runId++; cancelAnim();
+    cur = c; moves = c.moves; playing = false;
+    resetToStart();
+    renderStage();
+    if (opts && opts.scroll && window.matchMedia && window.matchMedia('(max-width: 879px)').matches) {
+      const st = $('#stage');
+      try { window.scrollTo({ top: st.getBoundingClientRect().top + window.scrollY - 8, behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (e) { /* ignora */ }
+    }
+    if (opts && opts.autoplay) play();
+  }
+
+  /* ---------- stage UI ---------- */
+  const review = { on: false, kinds: new Set(['oll', 'pll']), onlyNew: false, revealed: false };
+  const el = {
+    kind: $('#caseKind'), name: $('#caseName'), alg: $('#alg'), controls: $('#controls'),
+    learn: $('#learnBtn'), rev: $('#review'), revPrompt: $('#revPrompt'), rShow: $('#rShow'), rGrade: $('#rGrade'),
+    bRestart: $('#bRestart'), bBack: $('#bBack'), bPlay: $('#bPlay'), bNext: $('#bNext'),
+    speed: $('#speed'), noGL: $('#noGL'), progress: $('#progress'),
+  };
+
+  function algHTML(c) {
+    let html = '', depth = 0, mi = 0;
+    for (const t of c.items) {
+      if (t.t === '(') { html += '<span class="grp">'; depth++; }
+      else if (t.t === ')') { if (depth) { html += '</span> '; depth--; } }
+      else html += '<span class="mv" data-i="' + (mi++) + '">' + esc(t.text) + '</span> ';
+    }
+    while (depth--) html += '</span>';
+    return html;
+  }
+  function renderStage() {
+    if (!cur) return;
+    el.kind.textContent = KIND[cur.kind] + ' · ' + cur.group;
+    el.name.textContent = cur.name;
+    const hidden = review.on && !review.revealed;
+    if (hidden) {
+      el.alg.innerHTML = '<span class="mask">Algoritmo nascosto. Prova a ricordarlo, poi mostralo.</span>';
+    } else {
+      el.alg.innerHTML = algHTML(cur);
+    }
+    el.controls.hidden = hidden;
+    el.rev.hidden = !review.on;
+    el.rShow.hidden = review.revealed;
+    el.rGrade.hidden = !review.revealed;
+    el.revPrompt.textContent = review.revealed ? 'Come è andata?' : 'Ricordi l’algoritmo per questo caso?';
+    updateLearnBtn();
+    updateTokens();
+    updateButtons();
+  }
+  function updateTokens() {
+    const spans = el.alg.querySelectorAll('.mv');
+    spans.forEach((s) => {
+      const i = +s.dataset.i;
+      s.classList.toggle('done', i < k);
+      s.classList.toggle('next', i === k && k < moves.length);
+    });
+  }
+  const ICON = {
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>',
+    pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
+  };
+  function updateButtons() {
+    el.bPlay.innerHTML = playing ? ICON.pause : ICON.play;
+    el.bPlay.setAttribute('aria-label', playing ? 'Pausa' : 'Riproduci');
+    el.bBack.disabled = busy || k <= 0;
+    el.bNext.disabled = busy || k >= moves.length;
+    el.bRestart.disabled = busy && !playing ? true : false;
+  }
+  function updateLearnBtn() {
+    if (!cur) return;
+    const on = learned.has(cur.id);
+    el.learn.classList.toggle('on', on);
+    el.learn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    el.learn.querySelector('span').textContent = on ? 'Imparato' : 'Lo so già';
+  }
+  function updateProgress() {
+    el.progress.innerHTML = '<b>' + learned.size + '</b> / ' + CASES.length + ' imparati';
+    document.querySelectorAll('.tab[data-tab]').forEach((t) => {
+      const kd = t.dataset.tab;
+      const sub = t.querySelector('small');
+      if (sub && kd !== 'rev') { const all = byKind(kd); sub.textContent = all.filter((c) => learned.has(c.id)).length + '/' + all.length; }
+    });
+  }
+  function toggleLearned(c) {
+    if (learned.has(c.id)) learned.delete(c.id); else learned.add(c.id);
+    saveLearned(); updateProgress(); updateLearnBtn(); renderList();
+  }
+
+  el.bPlay.addEventListener('click', () => { if (playing) pause(); else play(); });
+  el.bNext.addEventListener('click', () => { playing = false; stepForward(runId); });
+  el.bBack.addEventListener('click', stepBack);
+  el.bRestart.addEventListener('click', () => { runId++; cancelAnim(); playing = false; resetToStart(); });
+  el.learn.addEventListener('click', () => { if (cur) toggleLearned(cur); });
+  el.speed.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-s]');
+    if (!b) return;
+    speedIdx = +b.dataset.s;
+    el.speed.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  });
+
+  /* ---------- miniature (OLL e PLL) ---------- */
+  function thumb(c) {
+    if (c.thumb) return c.thumb;
+    if (c.kind === 'f2l') return (c.thumb = '');
+    const t = E.newCube();
+    E.applyMoves(t, E.invert(c.moves));
+    const mode = c.kind;
+    const fill = (L) => (mode === 'oll' ? (L === 'U' ? 'var(--c-U)' : 'var(--thumb-off)') : 'var(--c-' + L + ')');
+    const rect = (x, y, w, h, L) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="1.6" style="fill:' + fill(L) + '"/>';
+    let s = '<svg viewBox="0 0 60 60" class="thumb" aria-hidden="true">';
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++)
+      s += rect(11 + i * 13, 11 + j * 13, 12, 12, mode === 'pll' ? 'U' : E.getSticker(t, [i - 1, 1, j - 1], [0, 1, 0]));
+    for (let i = 0; i < 3; i++) {
+      s += rect(11 + i * 13, 4, 12, 5, E.getSticker(t, [i - 1, 1, -1], [0, 0, -1]));
+      s += rect(11 + i * 13, 51, 12, 5, E.getSticker(t, [i - 1, 1, 1], [0, 0, 1]));
+    }
+    for (let j = 0; j < 3; j++) {
+      s += rect(4, 11 + j * 13, 5, 12, E.getSticker(t, [-1, 1, j - 1], [-1, 0, 0]));
+      s += rect(51, 11 + j * 13, 5, 12, E.getSticker(t, [1, 1, j - 1], [1, 0, 0]));
+    }
+    return (c.thumb = s + '</svg>');
+  }
+
+  /* ---------- libreria ---------- */
+  const state = { tab: 'oll', filter: '', q: '' };
+  const listEl = $('#list'), filtersEl = $('#filters'), searchEl = $('#search');
+
+  function renderFilters() {
+    const groups = [...new Set(byKind(state.tab).map((c) => c.group))];
+    filtersEl.innerHTML = '<button class="chip' + (state.filter === '' ? ' on' : '') + '" data-g="">Tutti</button>' +
+      groups.map((g) => '<button class="chip' + (state.filter === g ? ' on' : '') + '" data-g="' + esc(g) + '">' + esc(g) + '</button>').join('');
+  }
+  function renderList() {
+    if (state.tab === 'rev') return;
+    const q = state.q.trim().toLowerCase();
+    let items = byKind(state.tab).filter((c) => (!state.filter || c.group === state.filter) &&
+      (!q || (c.name + ' ' + c.group + ' ' + c.alg).toLowerCase().indexOf(q) !== -1));
+    if (!items.length) { listEl.innerHTML = '<p class="empty">Nessun caso corrisponde alla ricerca.</p>'; return; }
+    let html = '', lastG = null;
+    for (const c of items) {
+      if (c.group !== lastG) { html += '<h3 class="gh">' + esc(c.group) + '</h3>'; lastG = c.group; }
+      const t = thumb(c);
+      const active = cur && cur.id === c.id ? ' active' : '';
+      html += '<div class="row' + active + '" role="button" tabindex="0" data-id="' + c.id + '">' +
+        (t ? '<div class="th">' + t + '</div>' : '<div class="th tagbox">' + esc(c.tag) + '</div>') +
+        '<div class="rt"><div class="rn">' + esc(c.name) + '</div><div class="ra">' + esc(c.alg) + '</div></div>' +
+        '<button class="mark' + (learned.has(c.id) ? ' on' : '') + '" data-mark="' + c.id + '" aria-label="Segna ' + esc(c.name) + ' come imparato" aria-pressed="' + (learned.has(c.id) ? 'true' : 'false') + '">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>';
+    }
+    listEl.innerHTML = html;
+  }
+  const caseById = (id) => CASES.find((c) => c.id === id);
+  listEl.addEventListener('click', (e) => {
+    const mk = e.target.closest('[data-mark]');
+    if (mk) { e.stopPropagation(); toggleLearned(caseById(mk.dataset.mark)); return; }
+    const row = e.target.closest('.row');
+    if (row) { loadCase(caseById(row.dataset.id), { scroll: true }); renderList(); }
+  });
+  listEl.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('row')) {
+      e.preventDefault(); loadCase(caseById(e.target.dataset.id), { scroll: true }); renderList();
+    }
+  });
+  filtersEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-g]');
+    if (!b) return;
+    state.filter = b.dataset.g; renderFilters(); renderList();
+  });
+  searchEl.addEventListener('input', () => { state.q = searchEl.value; renderList(); });
+
+  /* ---------- ripasso ---------- */
+  const revView = $('#revView'), libView = $('#libView');
+  function nextReview() {
+    const pool = CASES.filter((c) => review.kinds.has(c.kind) && (!review.onlyNew || !learned.has(c.id)) && c !== cur);
+    const msg = $('#revMsg');
+    if (!pool.length) { msg.textContent = 'Nessun caso disponibile con questi filtri.'; return; }
+    msg.textContent = '';
+    review.revealed = false;
+    loadCase(pool[Math.floor(Math.random() * pool.length)], { scroll: true });
+  }
+  $('#rShow').addEventListener('click', () => { review.revealed = true; renderStage(); play(); });
+  $('#rKnew').addEventListener('click', () => { learned.add(cur.id); saveLearned(); updateProgress(); nextReview(); });
+  $('#rAgain').addEventListener('click', () => { learned.delete(cur.id); saveLearned(); updateProgress(); nextReview(); });
+  $('#revKinds').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-k]');
+    if (!b) return;
+    const kd = b.dataset.k;
+    if (review.kinds.has(kd) && review.kinds.size > 1) review.kinds.delete(kd); else review.kinds.add(kd);
+    b.parentElement.querySelectorAll('[data-k]').forEach((x) => x.classList.toggle('on', review.kinds.has(x.dataset.k)));
+  });
+  $('#onlyNew').addEventListener('change', (e) => { review.onlyNew = e.target.checked; });
+  $('#revNext').addEventListener('click', nextReview);
+
+  /* ---------- schede ---------- */
+  function setTab(t) {
+    state.tab = t;
+    document.querySelectorAll('.tab').forEach((b) => {
+      const on = b.dataset.tab === t;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+    review.on = t === 'rev';
+    libView.hidden = review.on;
+    revView.hidden = !review.on;
+    if (review.on) {
+      review.revealed = false;
+      nextReview();
+    } else {
+      state.filter = ''; state.q = ''; searchEl.value = '';
+      renderFilters(); renderList();
+      if (cur) renderStage();
+    }
+  }
+  $('#tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('.tab');
+    if (b && b.dataset.tab !== state.tab) { runId++; cancelAnim(); playing = false; setTab(b.dataset.tab); }
+  });
+
+  /* ---------- avvio ---------- */
+  initGL();
+  if (!hasGL) el.noGL.hidden = false;
+  updateProgress();
+  setTab('oll');
+  loadCase(caseById('oll-27'));
+  renderList();
+})();
+
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>
