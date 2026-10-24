@@ -32,6 +32,7 @@ img { max-width: 100%; }
   --accent: #f4b400;
   --on-accent: #1b1400;
   --thumb-off: #a3adbb;
+  --arrow: #16191f;
   --c-U: #ffd500; --c-D: #f1f1ec; --c-F: #0b4fc2; --c-B: #0b9a4b; --c-R: #c8202f; --c-L: #ff6a13;
   --f-display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
   --f-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -70,7 +71,12 @@ h1 { font-family: var(--f-display); font-weight: 800; font-size: 28px; line-heig
 .hint { position: absolute; left: 12px; bottom: 8px; font-size: 11.5px; color: var(--muted); pointer-events: none; }
 #noGL { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
 .stage-body { padding: 14px 14px 16px; display: grid; gap: 12px; }
-.case-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.case-head { display: flex; align-items: center; gap: 12px; }
+.case-title { flex: 1 1 auto; min-width: 0; }
+.case-pic { flex: none; width: 84px; height: 84px; }
+.case-pic .thumb { width: 84px; height: 84px; }
+.arrows { fill: var(--arrow); stroke: var(--arrow); stroke-width: 1.3; stroke-linecap: round; }
+.arrows polygon { stroke-width: 0.6; stroke-linejoin: round; }
 .case-kind { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 h2 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 2px 0 0; line-height: 1.1; }
 .learn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); font-weight: 600; font-size: 13px; white-space: nowrap; }
@@ -167,7 +173,8 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 2
       </div>
       <div class="stage-body">
         <div class="case-head">
-          <div>
+          <div class="case-pic" id="casePic" hidden></div>
+          <div class="case-title">
             <div class="case-kind" id="caseKind"></div>
             <h2 id="caseName"></h2>
           </div>
@@ -677,7 +684,7 @@ const ALGS = {
   /* ---------- stage UI ---------- */
   const review = { on: false, kinds: new Set(['oll', 'pll']), onlyNew: false, revealed: false };
   const el = {
-    kind: $('#caseKind'), name: $('#caseName'), alg: $('#alg'), controls: $('#controls'),
+    kind: $('#caseKind'), name: $('#caseName'), pic: $('#casePic'), alg: $('#alg'), controls: $('#controls'),
     learn: $('#learnBtn'), rev: $('#review'), revPrompt: $('#revPrompt'), rShow: $('#rShow'), rGrade: $('#rGrade'),
     bRestart: $('#bRestart'), bBack: $('#bBack'), bPlay: $('#bPlay'), bNext: $('#bNext'),
     speed: $('#speed'), noGL: $('#noGL'), progress: $('#progress'),
@@ -697,6 +704,9 @@ const ALGS = {
     if (!cur) return;
     el.kind.textContent = KIND[cur.kind] + ' · ' + cur.group;
     el.name.textContent = cur.name;
+    const pic = cur.kind === 'f2l' ? '' : thumb(cur);
+    el.pic.innerHTML = pic;
+    el.pic.hidden = !pic;
     const hidden = review.on && !review.revealed;
     if (hidden) {
       el.alg.innerHTML = '<span class="mask">Algoritmo nascosto. Prova a ricordarlo, poi mostralo.</span>';
@@ -783,7 +793,54 @@ const ALGS = {
       s += rect(4, 11 + j * 13, 5, 12, E.getSticker(t, [-1, 1, j - 1], [-1, 0, 0]));
       s += rect(51, 11 + j * 13, 5, 12, E.getSticker(t, [1, 1, j - 1], [1, 0, 0]));
     }
+    if (mode === 'pll') s += pllArrowsSVG(t);
     return (c.thumb = s + '</svg>');
+  }
+
+  /* Frecce PLL: per ogni cubetto dello strato superiore, da dove si trova a dove lo porta l'algoritmo. */
+  function pllMoves(t) {
+    const find = (h) => t.find((x) => x.home[0] === h[0] && x.home[1] === h[1] && x.home[2] === h[2]).pos;
+    const pD = find([0, -1, 0]), pF = find([0, 0, 1]);
+    const ey = [-pD[0], -pD[1], -pD[2]], ez = pF;
+    const ex = [ey[1] * ez[2] - ey[2] * ez[1], ey[2] * ez[0] - ey[0] * ez[2], ey[0] * ez[1] - ey[1] * ez[0]];
+    const Q = [ex[0], ey[0], ez[0], ex[1], ey[1], ez[1], ex[2], ey[2], ez[2]];
+    const out = [];
+    for (const x of t) {
+      if (x.pos[1] !== 1 || (x.pos[0] === 0 && x.pos[2] === 0)) continue;
+      const to = E.mulVec(Q, x.home);
+      if (to[0] !== x.pos[0] || to[2] !== x.pos[2]) out.push({ from: [x.pos[0], x.pos[2]], to: [to[0], to[2]] });
+    }
+    return out;
+  }
+  function pllArrowsSVG(t) {
+    const mv = pllMoves(t);
+    const key = (p) => p[0] + ',' + p[1];
+    const map = new Map(mv.map((m) => [key(m.from), m.to]));
+    const done = new Set();
+    const cx = (v) => 30 + 13 * v;
+    let s = '<g class="arrows">';
+    for (const m of mv) {
+      const a = key(m.from), b = key(m.to);
+      if (done.has(a)) continue;
+      const swap = map.has(b) && key(map.get(b)) === a;
+      done.add(a);
+      if (swap) done.add(b);
+      s += arrow(cx(m.from[0]), cx(m.from[1]), cx(m.to[0]), cx(m.to[1]), swap);
+    }
+    return s + '</g>';
+  }
+  function arrow(x1, y1, x2, y2, both) {
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const hl = 3.6, hw = 2.25, tail = both ? 2.6 : 5, tip = 2.6;
+    const sx = x1 + ux * tail, sy = y1 + uy * tail, ex = x2 - ux * tip, ey = y2 - uy * tip;
+    const head = (tx, ty, dirx, diry) => {
+      const bx = tx - dirx * hl, by = ty - diry * hl;
+      return '<polygon points="' + [tx, ty, bx - diry * hw, by + dirx * hw, bx + diry * hw, by - dirx * hw].map((n) => n.toFixed(2)).join(' ') + '"/>';
+    };
+    const ls = both ? [sx + ux * (hl - 0.6), sy + uy * (hl - 0.6)] : [sx, sy];
+    const le = [ex - ux * (hl - 0.6), ey - uy * (hl - 0.6)];
+    return '<line x1="' + ls[0].toFixed(2) + '" y1="' + ls[1].toFixed(2) + '" x2="' + le[0].toFixed(2) + '" y2="' + le[1].toFixed(2) + '"/>' +
+      head(ex, ey, ux, uy) + (both ? head(sx, sy, -ux, -uy) : '');
   }
 
   /* ---------- libreria ---------- */
