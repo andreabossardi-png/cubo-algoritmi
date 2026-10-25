@@ -33,6 +33,7 @@ img { max-width: 100%; }
   --on-accent: #1b1400;
   --thumb-off: #a3adbb;
   --arrow: #16191f;
+  --sexy: #c8202f;
   --c-U: #ffd500; --c-D: #f1f1ec; --c-F: #0b4fc2; --c-B: #0b9a4b; --c-R: #c8202f; --c-L: #ff6a13;
   --f-display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
   --f-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -41,12 +42,12 @@ img { max-width: 100%; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f1318; --surface: #181d24; --surface-2: #222933; --stage-bg: #1d232c; --ink: #e9edf2; --muted: #98a3b3;
-    --line: #2d3541; --accent: #f6c21a; --on-accent: #1b1400; --thumb-off: #4a5464; color-scheme: dark;
+    --line: #2d3541; --accent: #f6c21a; --on-accent: #1b1400; --thumb-off: #4a5464; --sexy: #ff6b72; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1318; --surface: #181d24; --surface-2: #222933; --stage-bg: #1d232c; --ink: #e9edf2; --muted: #98a3b3;
-  --line: #2d3541; --accent: #f6c21a; --on-accent: #1b1400; --thumb-off: #4a5464; color-scheme: dark;
+  --line: #2d3541; --accent: #f6c21a; --on-accent: #1b1400; --thumb-off: #4a5464; --sexy: #ff6b72; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -86,6 +87,7 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 2
 .alg { font-family: var(--f-mono); font-size: 15.5px; line-height: 2.1; background: var(--surface-2); border-radius: 12px; padding: 8px 12px; min-height: 52px; overflow-wrap: anywhere; }
 .mv { display: inline-block; padding: 0 6px; border-radius: 6px; line-height: 1.7; transition: opacity 0.15s; }
 .mv.done { opacity: 0.38; }
+.sx { color: var(--sexy); font-weight: 700; }
 .mv.next { background: var(--accent); color: var(--on-accent); }
 .grp { display: inline; border-bottom: 2px solid var(--line); padding-bottom: 1px; }
 .mask { font-family: var(--f-body); font-size: 14px; color: var(--muted); }
@@ -241,6 +243,7 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 2
           <li><code>r u f</code> minuscole girano due strati insieme. <code>M E S</code> girano lo strato centrale.</li>
           <li><code>x y z</code> ruotano tutto il cubo come R, U, F.</li>
           <li>Le parentesi raggruppano sequenze che si ripetono, utili per memorizzare.</li>
+          <li>In <span class="sx">rosso</span> la sexy move <code>R U R' U'</code>, la sequenza più ricorrente.</li>
         </ul>
       </details>
       <p class="credit">Gli algoritmi sono quelli di SolveTheCube.com/algorithms, qui con cubo 3D, ripasso e riproduzione mossa per mossa.</p>
@@ -690,12 +693,32 @@ const ALGS = {
     speed: $('#speed'), noGL: $('#noGL'), progress: $('#progress'),
   };
 
+  /* Sexy move R U R' U': segna le mosse che ne fanno parte */
+  const SEXY = ['R', 'U', "R'", "U'"];
+  function sexyFlags(moves) {
+    const f = new Array(moves.length).fill(false);
+    for (let i = 0; i + 4 <= moves.length; i++) {
+      if (SEXY.every((s, j) => moves[i + j].text === s)) { for (let j = 0; j < 4; j++) f[i + j] = true; i += 3; }
+    }
+    return f;
+  }
+  function listAlgHTML(c) {
+    const f = sexyFlags(c.moves);
+    let out = '', mi = 0;
+    for (const t of c.items) {
+      if (t.t === '(') out += '(';
+      else if (t.t === ')') out = out.replace(/ $/, '') + ') ';
+      else { const sx = f[mi++]; out += (sx ? '<span class="sx">' : '') + esc(t.text) + (sx ? '</span>' : '') + ' '; }
+    }
+    return out.trim();
+  }
   function algHTML(c) {
+    const f = sexyFlags(c.moves);
     let html = '', depth = 0, mi = 0;
     for (const t of c.items) {
       if (t.t === '(') { html += '<span class="grp">'; depth++; }
       else if (t.t === ')') { if (depth) { html += '</span> '; depth--; } }
-      else html += '<span class="mv" data-i="' + (mi++) + '">' + esc(t.text) + '</span> ';
+      else { html += '<span class="mv' + (f[mi] ? ' sx' : '') + '" data-i="' + mi + '">' + esc(t.text) + '</span> '; mi++; }
     }
     while (depth--) html += '</span>';
     return html;
@@ -865,7 +888,7 @@ const ALGS = {
       const active = cur && cur.id === c.id ? ' active' : '';
       html += '<div class="row' + active + '" role="button" tabindex="0" data-id="' + c.id + '">' +
         (t ? '<div class="th">' + t + '</div>' : '<div class="th tagbox">' + esc(c.tag) + '</div>') +
-        '<div class="rt"><div class="rn">' + esc(c.name) + '</div><div class="ra">' + esc(c.alg) + '</div></div>' +
+        '<div class="rt"><div class="rn">' + esc(c.name) + '</div><div class="ra">' + listAlgHTML(c) + '</div></div>' +
         '<button class="mark' + (learned.has(c.id) ? ' on' : '') + '" data-mark="' + c.id + '" aria-label="Segna ' + esc(c.name) + ' come imparato" aria-pressed="' + (learned.has(c.id) ? 'true' : 'false') + '">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>';
     }
