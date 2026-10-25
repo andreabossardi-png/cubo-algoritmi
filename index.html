@@ -480,7 +480,57 @@ const ALGS = {
     id: 'oll-' + n, kind: 'oll', name: 'OLL ' + n, tag: String(n), group: g.group, alg })));
   ALGS.pll.forEach((g) => g.items.forEach(([n, alg]) => CASES.push({
     id: 'pll-' + n, kind: 'pll', name: 'Perm ' + n, tag: n, group: g.group, alg })));
-  CASES.forEach((c) => { c.items = E.tokenize(c.alg); c.moves = c.items.filter((t) => t.t === 'move'); });
+  CASES.forEach((c) => {
+    c.items = regroupSexy(E.tokenize(c.alg));
+    c.moves = c.items.filter((t) => t.t === 'move');
+    c.alg = itemsToString(c.items);
+  });
+
+  /* Ogni R U R' U' diventa un gruppo tra parentesi; le mosse non cambiano, solo i raggruppamenti. */
+  function regroupSexy(items) {
+    const moves = [], gid = [];
+    let g = 0, cur = 0;
+    for (const t of items) {
+      if (t.t === '(') cur = ++g;
+      else if (t.t === ')') cur = 0;
+      else { moves.push(t); gid.push(cur); }
+    }
+    const SX = ['R', 'U', "R'", "U'"];
+    for (let i = 0; i + 4 <= moves.length; i++) {
+      if (!SX.every((s, j) => moves[i + j].text === s)) continue;
+      const inRun = (k) => k >= i && k < i + 4;
+      const touched = new Set(gid.slice(i, i + 4).filter((x) => x));
+      for (const tg of touched) {
+        // le parti di un gruppo spezzato restano gruppi separati prima e dopo
+        const before = ++g, after = ++g;
+        for (let k = 0; k < moves.length; k++) if (gid[k] === tg && !inRun(k)) gid[k] = k < i ? before : after;
+      }
+      const ng = ++g;
+      for (let k = i; k < i + 4; k++) gid[k] = ng;
+      i += 3;
+    }
+    const size = {};
+    gid.forEach((x) => { if (x) size[x] = (size[x] || 0) + 1; });
+    const out = [];
+    for (let k = 0; k < moves.length; k++) {
+      const x = size[gid[k]] > 1 ? gid[k] : 0;
+      const prev = k > 0 && size[gid[k - 1]] > 1 ? gid[k - 1] : 0;
+      const next = k + 1 < moves.length && size[gid[k + 1]] > 1 ? gid[k + 1] : 0;
+      if (x && x !== prev) out.push({ t: '(' });
+      out.push(moves[k]);
+      if (x && x !== next) out.push({ t: ')' });
+    }
+    return out;
+  }
+  function itemsToString(items) {
+    let s = '';
+    for (const t of items) {
+      if (t.t === '(') s += '(';
+      else if (t.t === ')') s = s.replace(/ $/, '') + ') ';
+      else s += t.text + ' ';
+    }
+    return s.trim();
+  }
   const byKind = (k) => CASES.filter((c) => c.kind === k);
 
   /* ---------- memoria locale (solo comodita) ---------- */
