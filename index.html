@@ -89,7 +89,11 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 24px; margin: 2
 .mv.done { opacity: 0.38; }
 .sx { color: var(--sexy); font-weight: 700; }
 .mv.next { background: var(--accent); color: var(--on-accent); }
-.grp { display: inline; border-bottom: 2px solid var(--line); padding-bottom: 1px; }
+.nb { display: inline-block; white-space: nowrap; }
+.par { color: var(--muted); }
+.nb > .par:first-child { margin-right: -5px; }
+.nb > .par:last-child { margin-left: -5px; }
+.par.sx { color: var(--sexy); }
 .mask { font-family: var(--f-body); font-size: 14px; color: var(--muted); }
 .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .transport { display: flex; align-items: center; gap: 8px; }
@@ -756,22 +760,27 @@ const ALGS = {
     const f = sexyFlags(c.moves);
     let out = '', mi = 0;
     for (const t of c.items) {
-      if (t.t === '(') out += '(';
-      else if (t.t === ')') out = out.replace(/ $/, '') + ') ';
+      if (t.t === '(') out += f[mi] ? '<span class="sx">(</span>' : '(';
+      else if (t.t === ')') out = out.replace(/ $/, '') + (f[mi - 1] ? '<span class="sx">)</span> ' : ') ');
       else { const sx = f[mi++]; out += (sx ? '<span class="sx">' : '') + esc(t.text) + (sx ? '</span>' : '') + ' '; }
     }
     return out.trim();
   }
   function algHTML(c) {
+    // ogni mossa e un pezzo; le parentesi si attaccano alla mossa vicina per non finire da sole a capo
     const f = sexyFlags(c.moves);
-    let html = '', depth = 0, mi = 0;
+    const pieces = [];
+    let open = '', mi = 0;
     for (const t of c.items) {
-      if (t.t === '(') { html += '<span class="grp">'; depth++; }
-      else if (t.t === ')') { if (depth) { html += '</span> '; depth--; } }
-      else { html += '<span class="mv' + (f[mi] ? ' sx' : '') + '" data-i="' + mi + '">' + esc(t.text) + '</span> '; mi++; }
+      if (t.t === '(') open = '<span class="par' + (f[mi] ? ' sx' : '') + '">(</span>';
+      else if (t.t === ')') {
+        if (pieces.length) pieces[pieces.length - 1].close = '<span class="par' + (f[mi - 1] ? ' sx' : '') + '">)</span>';
+      } else {
+        pieces.push({ open, close: '', mv: '<span class="mv' + (f[mi] ? ' sx' : '') + '" data-i="' + mi + '">' + esc(t.text) + '</span>' });
+        open = ''; mi++;
+      }
     }
-    while (depth--) html += '</span>';
-    return html;
+    return pieces.map((p) => (p.open || p.close ? '<span class="nb">' + p.open + p.mv + p.close + '</span>' : p.mv)).join(' ');
   }
   function renderStage() {
     if (!cur) return;
